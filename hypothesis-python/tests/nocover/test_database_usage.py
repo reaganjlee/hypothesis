@@ -8,6 +8,7 @@
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at https://mozilla.org/MPL/2.0/.
 
+import pytest
 import os.path
 
 from hypothesis import assume, core, find, given, settings, strategies as st
@@ -16,6 +17,7 @@ from hypothesis.database import (
     GitHubArtifactDatabase,
     InMemoryExampleDatabase,
     ReadOnlyDatabase,
+    DirectoryBasedExampleDatabase,
 )
 from hypothesis.errors import NoSuchExample, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
@@ -147,6 +149,16 @@ def test_does_not_use_database_when_seed_is_forced(monkeypatch):
         pass
 
     test()
+
+
+@pytest.mark.parametrize("db_cls", [ExampleDatabase, DirectoryBasedExampleDatabase])
+def test_database_handles_permissions_correctly(db_cls, tmp_path):
+    tmp_path.chmod(0o000)
+    try:
+        database = db_cls(tmp_path)
+        database.save(b"fizz", b"buzz")
+    finally:
+        tmp_path.chmod(0o777)
 
 
 @given(st.binary(), st.binary())
