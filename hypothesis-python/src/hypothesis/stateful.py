@@ -17,8 +17,9 @@ execution to date.
 """
 import collections
 import inspect
+import sys
 from copy import copy
-from functools import lru_cache
+from functools import lru_cache, partial
 from io import StringIO
 from time import perf_counter
 from typing import (
@@ -30,6 +31,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Tuple,
     Union,
     overload,
 )
@@ -66,6 +68,7 @@ from hypothesis.strategies._internal.strategies import (
     Ex,
     Ex_Inv,
     OneOfStrategy,
+    SampledFromStrategy,
     SearchStrategy,
     check_strategy,
 )
@@ -479,7 +482,7 @@ class Rule:
 self_strategy = st.runner()
 
 
-class Bundle(SearchStrategy[Ex]):
+class Bundle(SampledFromStrategy[Ex]):
     """A collection of values for use in stateful testing.
 
     Bundles are a kind of strategy where values can be added by rules,
@@ -501,28 +504,66 @@ class Bundle(SearchStrategy[Ex]):
     drawn from this bundle will be consumed (as above) when requested.
     """
 
-    def __init__(self, name: str, *, consume: bool = False) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        consume: bool = False,
+        transformations: Tuple[Tuple[str, Any], ...] = (),
+    ) -> None:
+        super().__init__(
+            [...], transformations=transformations
+        )  # Some random items that'll get replaced in do_draw
         self.name = name
         self.consume = consume
 
-    def do_draw(self, data):
-        machine = data.draw(self_strategy)
+        self.bundle = None
 
-        bundle = machine.bundle(self.name)
-        if not bundle:
-            data.mark_invalid(f"Cannot draw from empty bundle {self.name!r}")
         # Shrink towards the right rather than the left. This makes it easier
         # to delete data generated earlier, as when the error is towards the
         # end there can be a lot of hard to remove padding.
-        position = data.draw_integer(0, len(bundle) - 1, shrink_towards=len(bundle))
-        if self.consume:
-            reference = bundle.pop(
-                position
-            )  # pragma: no cover  # coverage is flaky here
-        else:
-            reference = bundle[position]
+        self._SHRINK_TOWARDS = sys.maxsize
 
+    def reference_to_val_func(self, dic, item):
+        assert isinstance(item, int)
+
+        element = self.bundle[item]
+
+        assert isinstance(element, VarReference)
+        return dic.get(element.name)
+
+    def do_draw(self, data):
+        machine = data.draw(self_strategy)
+        bundle = machine.bundle(self.name)
+        if not bundle:
+            data.mark_invalid(f"Cannot draw from empty bundle {self.name!r}")
+
+        self.bundle = bundle
+        self.elements = range(len(bundle))
+
+        self.reference_to_value = partial(
+            self.reference_to_val_func, machine.names_to_values
+        )
+
+        idx = super().do_draw(data)
+        reference = bundle[idx]
+        if self.consume:
+            bundle.pop(idx)  # pragma: no cover # coverage is flaky here
         return reference
+
+    def filter(self, condition):
+        return type(self)(
+            self.name,
+            consume=self.consume,
+            transformations=(*self._transformations, ("filter", condition)),
+        )
+
+    def map(self, pack):
+        return type(self)(
+            self.name,
+            consume=self.consume,
+            transformations=(*self._transformations, ("map", pack)),
+        )
 
     def __repr__(self):
         consume = self.consume
@@ -560,6 +601,7 @@ def consumes(bundle: Bundle[Ex]) -> SearchStrategy[Ex]:
     return type(bundle)(
         name=bundle.name,
         consume=True,
+        transformations=bundle._transformations,
     )
 
 
