@@ -23,19 +23,7 @@ from copy import copy
 from functools import lru_cache, partial
 from io import StringIO
 from time import perf_counter
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    overload,
-)
+from typing import Any, Callable, ClassVar, Optional, Union, overload
 from unittest import TestCase
 
 import attr
