@@ -1419,7 +1419,7 @@ state.teardown()
     )
 
 
-def test_flatmap():
+def test_flatmap_with_filter():
     class Machine(RuleBasedStateMachine):
         buns = Bundle("buns")
 
@@ -1430,6 +1430,15 @@ def test_flatmap():
         @rule(target=buns, bun=buns.flatmap(lambda x: just(x + 1)))
         def use_flatmap(self, bun):
             assert isinstance(bun, int)
+            return bun
+
+        @rule(
+            target=buns,
+            bun=buns.flatmap(lambda x: just(x + 1)).filter(lambda x: x > 0),
+        )
+        def use_flatmap(self, bun):
+            assert isinstance(bun, int)
+            assert bun > 0
             return bun
 
         @rule(bun=buns)

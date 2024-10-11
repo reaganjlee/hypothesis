@@ -553,6 +553,8 @@ class Bundle(SampledFromStrategy[Ex]):
         reference = bundle[idx]
         if self.consume:
             bundle.pop(idx)  # pragma: no cover # coverage is flaky here
+        if not self.draw_references:
+            return machine.names_to_values[reference.name]
         return reference
 
     def filter(self, condition):
@@ -561,7 +563,7 @@ class Bundle(SampledFromStrategy[Ex]):
             consume=self.consume,
             draw_references=self.draw_references,
             transformations=(*self._transformations, ("filter", condition)),
-            repr=self.repr_,
+            repr_=self.repr_,
         )
 
     def map(self, pack):
@@ -570,7 +572,7 @@ class Bundle(SampledFromStrategy[Ex]):
             consume=self.consume,
             draw_references=self.draw_references,
             transformations=(*self._transformations, ("map", pack)),
-            repr=self.repr_,
+            repr_=self.repr_,
         )
 
     def __repr__(self):
@@ -593,7 +595,11 @@ class Bundle(SampledFromStrategy[Ex]):
     def flatmap(self, expand):
         if self.draw_references:
             return type(self)(
-                self.name, consume=self.consume, draw_references=False
+                self.name,
+                consume=self.consume,
+                draw_references=False,
+                transformations=self._transformations,
+                repr_=self.repr_,
             ).flatmap(expand)
         return super().flatmap(expand)
 
