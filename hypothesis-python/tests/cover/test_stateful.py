@@ -1320,6 +1320,105 @@ class LotsOfEntropyPerStepMachine(RuleBasedStateMachine):
 TestLotsOfEntropyPerStepMachine = LotsOfEntropyPerStepMachine.TestCase
 
 
+def test_filter():
+    class Machine(RuleBasedStateMachine):
+        a = Bundle("a")
+
+        @initialize(target=a)
+        def initialize(self):
+            return multiple(1, 2, 3)
+
+        @rule(
+            a1=a.filter(lambda x: x < 2),
+            a2=a.filter(lambda x: x > 2),
+            a3=a,
+        )
+        def fail_fast(self, a1, a2, a3):
+            raise AssertionError
+
+    Machine.TestCase.settings = NO_BLOB_SETTINGS
+    with pytest.raises(AssertionError) as err:
+        run_state_machine_as_test(Machine)
+
+    result = "\n".join(err.value.__notes__)
+    assert (
+        result
+        == """
+Falsifying example:
+state = Machine()
+a_0, a_1, a_2 = state.initialize()
+state.fail_fast(a1=a_0, a2=a_2, a3=a_2)
+state.teardown()
+""".strip()
+    )
+
+
+def test_consumes_filter():
+    class Machine(RuleBasedStateMachine):
+        a = Bundle("a")
+
+        @initialize(target=a)
+        def initialize(self):
+            return multiple(1, 2, 3)
+
+        @rule(
+            a1=consumes(a).filter(lambda x: x < 2),
+            a2=consumes(a).filter(lambda x: x > 2),
+            a3=consumes(a),
+        )
+        def fail_fast(self, a1, a2, a3):
+            raise AssertionError
+
+    Machine.TestCase.settings = NO_BLOB_SETTINGS
+    with pytest.raises(AssertionError) as err:
+        run_state_machine_as_test(Machine)
+
+    result = "\n".join(err.value.__notes__)
+    assert (
+        result
+        == """
+Falsifying example:
+state = Machine()
+a_0, a_1, a_2 = state.initialize()
+state.fail_fast(a1=a_0, a2=a_2, a3=a_1)
+state.teardown()
+""".strip()
+    )
+
+
+def test_map_with_filter():
+    class Machine(RuleBasedStateMachine):
+        a = Bundle("a")
+
+        @initialize(target=a)
+        def initialize(self):
+            return multiple(2, 4)
+
+        @rule(
+            a1=a.map(lambda x: x**2).filter(lambda x: x < 3**2),
+            a2=consumes(a).map(lambda x: x**2).filter(lambda x: x > 3**2),
+            a3=consumes(a),
+        )
+        def fail_fast(self, a1, a2, a3):
+            raise AssertionError
+
+    Machine.TestCase.settings = NO_BLOB_SETTINGS
+    with pytest.raises(AssertionError) as err:
+        run_state_machine_as_test(Machine)
+
+    result = "\n".join(err.value.__notes__)
+    assert (
+        result
+        == """
+Falsifying example:
+state = Machine()
+a_0, a_1 = state.initialize()
+state.fail_fast(a1=a_0, a2=a_1, a3=a_0)
+state.teardown()
+""".strip()
+    )
+
+
 def test_flatmap():
     class Machine(RuleBasedStateMachine):
         buns = Bundle("buns")

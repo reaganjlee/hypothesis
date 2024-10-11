@@ -17,12 +17,25 @@ execution to date.
 """
 import collections
 import inspect
+import sys
 from collections.abc import Iterable, Sequence
 from copy import copy
-from functools import lru_cache
+from functools import lru_cache, partial
 from io import StringIO
 from time import perf_counter
-from typing import Any, Callable, ClassVar, Optional, Union, overload
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 from unittest import TestCase
 
 import attr
@@ -56,6 +69,7 @@ from hypothesis.strategies._internal.strategies import (
     Ex,
     Ex_Inv,
     OneOfStrategy,
+    SampledFromStrategy,
     SearchStrategy,
     check_strategy,
 )
@@ -469,7 +483,7 @@ class Rule:
 self_strategy = st.runner()
 
 
-class Bundle(SearchStrategy[Ex]):
+class Bundle(SampledFromStrategy[Ex]):
     """A collection of values for use in stateful testing.
 
     Bundles are a kind of strategy where values can be added by rules,
@@ -492,32 +506,72 @@ class Bundle(SearchStrategy[Ex]):
     """
 
     def __init__(
-        self, name: str, *, consume: bool = False, draw_references: bool = True
+        self,
+        name: str,
+        *,
+        consume: bool = False,
+        draw_references: bool = True,
+        **kwargs,
     ) -> None:
+        super().__init__(
+            [...], **kwargs
+        )  # Some random items that'll get replaced in do_draw
         self.name = name
         self.consume = consume
         self.draw_references = draw_references
 
-    def do_draw(self, data):
-        machine = data.draw(self_strategy)
+        self.bundle = None
 
-        bundle = machine.bundle(self.name)
-        if not bundle:
-            data.mark_invalid(f"Cannot draw from empty bundle {self.name!r}")
         # Shrink towards the right rather than the left. This makes it easier
         # to delete data generated earlier, as when the error is towards the
         # end there can be a lot of hard to remove padding.
-        position = data.draw_integer(0, len(bundle) - 1, shrink_towards=len(bundle))
-        if self.consume:
-            reference = bundle.pop(
-                position
-            )  # pragma: no cover  # coverage is flaky here
-        else:
-            reference = bundle[position]
+        self._SHRINK_TOWARDS = sys.maxsize
 
-        if self.draw_references:
-            return reference
-        return machine.names_to_values[reference.name]
+    def reference_to_val_func(self, dic, item):
+        assert isinstance(item, int)
+
+        element = self.bundle[item]
+
+        assert isinstance(element, VarReference)
+        return dic.get(element.name)
+
+    def do_draw(self, data):
+        machine = data.draw(self_strategy)
+        bundle = machine.bundle(self.name)
+        if not bundle:
+            data.mark_invalid(f"Cannot draw from empty bundle {self.name!r}")
+
+        # We use both self.bundle and self.elements to make sure an index is used to safely pop
+        self.bundle = bundle
+        self.elements = range(len(bundle))
+
+        self.reference_to_value = partial(
+            self.reference_to_val_func, machine.names_to_values
+        )
+
+        idx = super().do_draw(data)
+        reference = bundle[idx]
+        if self.consume:
+            bundle.pop(idx)  # pragma: no cover # coverage is flaky here
+        return reference
+
+    def filter(self, condition):
+        return type(self)(
+            self.name,
+            consume=self.consume,
+            draw_references=self.draw_references,
+            transformations=(*self._transformations, ("filter", condition)),
+            repr=self.repr_,
+        )
+
+    def map(self, pack):
+        return type(self)(
+            self.name,
+            consume=self.consume,
+            draw_references=self.draw_references,
+            transformations=(*self._transformations, ("map", pack)),
+            repr=self.repr_,
+        )
 
     def __repr__(self):
         consume = self.consume
@@ -562,6 +616,7 @@ def consumes(bundle: Bundle[Ex]) -> SearchStrategy[Ex]:
     return type(bundle)(
         name=bundle.name,
         consume=True,
+        transformations=bundle._transformations,
     )
 
 
