@@ -1436,7 +1436,7 @@ def test_flatmap_with_filter():
             target=buns,
             bun=buns.flatmap(lambda x: just(x + 1)).filter(lambda x: x > 0),
         )
-        def use_flatmap(self, bun):
+        def use_flatmap_filtered(self, bun):
             assert isinstance(bun, int)
             assert bun > 0
             return bun

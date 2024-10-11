@@ -23,7 +23,7 @@ from copy import copy
 from functools import lru_cache, partial
 from io import StringIO
 from time import perf_counter
-from typing import Any, Callable, ClassVar, Optional, Union, overload
+from typing import Any, Callable, ClassVar, Optional, Tuple, Union, overload
 from unittest import TestCase
 
 import attr
@@ -499,10 +499,13 @@ class Bundle(SampledFromStrategy[Ex]):
         *,
         consume: bool = False,
         draw_references: bool = True,
-        **kwargs,
+        repr_: Optional[str] = None,
+        transformations: Iterable[Tuple[str, Callable]] = (),
     ) -> None:
         super().__init__(
-            [...], **kwargs
+            [...],
+            repr_=repr_,
+            transformations=transformations,
         )  # Some random items that'll get replaced in do_draw
         self.name = name
         self.consume = consume
