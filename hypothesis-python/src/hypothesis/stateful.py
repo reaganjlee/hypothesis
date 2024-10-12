@@ -20,7 +20,7 @@ import inspect
 import sys
 from collections.abc import Iterable, Sequence
 from copy import copy
-from functools import lru_cache, partial
+from functools import lru_cache
 from io import StringIO
 from time import perf_counter
 from typing import Any, Callable, ClassVar, Optional, Union, overload
