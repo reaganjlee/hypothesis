@@ -512,40 +512,38 @@ class Bundle(SampledFromStrategy[Ex]):
         self.draw_references = draw_references
 
         self.bundle = None
+        self.machine = None
+        self.reference_to_value = self.reference_to_val_func
 
         # Shrink towards the right rather than the left. This makes it easier
         # to delete data generated earlier, as when the error is towards the
         # end there can be a lot of hard to remove padding.
         self._SHRINK_TOWARDS = sys.maxsize
 
-    def reference_to_val_func(self, dic, item):
+    def reference_to_val_func(self, item):
         assert isinstance(item, int)
-
         element = self.bundle[item]
-
         assert isinstance(element, VarReference)
-        return dic.get(element.name)
+        return self.machine.names_to_values.get(element.name)
 
     def do_draw(self, data):
-        machine = data.draw(self_strategy)
-        bundle = machine.bundle(self.name)
-        if not bundle:
+        self.machine = data.draw(self_strategy)
+        self.bundle = self.machine.bundle(self.name)
+        if not self.bundle:
             data.mark_invalid(f"Cannot draw from empty bundle {self.name!r}")
 
         # We use both self.bundle and self.elements to make sure an index is used to safely pop
-        self.bundle = bundle
-        self.elements = range(len(bundle))
-
-        self.reference_to_value = partial(
-            self.reference_to_val_func, machine.names_to_values
-        )
+        self.elements = range(len(self.bundle))
 
         idx = super().do_draw(data)
-        reference = bundle[idx]
+        reference = self.bundle[idx]
+
         if self.consume:
-            bundle.pop(idx)  # pragma: no cover # coverage is flaky here
+            self.bundle.pop(idx)  # pragma: no cover # coverage is flaky here
+
         if not self.draw_references:
-            return machine.names_to_values[reference.name]
+            return self.machine.names_to_values[reference.name]
+
         return reference
 
     def filter(self, condition):
