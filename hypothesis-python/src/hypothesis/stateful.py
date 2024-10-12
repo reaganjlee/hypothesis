@@ -23,7 +23,7 @@ from copy import copy
 from functools import lru_cache, partial
 from io import StringIO
 from time import perf_counter
-from typing import Any, Callable, ClassVar, Optional, Tuple, Union, overload
+from typing import Any, Callable, ClassVar, Optional, Union, overload
 from unittest import TestCase
 
 import attr
@@ -500,7 +500,7 @@ class Bundle(SampledFromStrategy[Ex]):
         consume: bool = False,
         draw_references: bool = True,
         repr_: Optional[str] = None,
-        transformations: Iterable[Tuple[str, Callable]] = (),
+        transformations: Iterable[tuple[str, Callable]] = (),
     ) -> None:
         super().__init__(
             [...],
