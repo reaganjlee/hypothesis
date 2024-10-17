@@ -549,7 +549,8 @@ class Bundle(SampledFromStrategy[Ex]):
         if not self.draw_references:
             return self.get_transformed_value(reference)
 
-        # we need both reference and the value itself to pretty-print deterministically and maintain any transformations that is bundle-specific
+        # we need both reference and the value itself to pretty-print deterministically
+        # and maintain any transformations that is bundle-specific
         return VarReferenceMapping(reference, self.get_transformed_value(reference))
 
     def filter(self, condition):
