@@ -887,8 +887,8 @@ class VarReference:
 
 @attr.s()
 class VarReferenceMapping:
-    reference = attr.ib(type=VarReference)
-    value = attr.ib()
+    reference: VarReference = attr.ib()
+    value: Any = attr.ib()
 
 
 # There are multiple alternatives for annotating the `precond` type, all of them
