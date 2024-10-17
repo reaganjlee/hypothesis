@@ -488,7 +488,6 @@ class SampledFromStrategy(SearchStrategy[Ex]):
         assert self.elements
         self.repr_ = repr_
         self._transformations = transformations
-        self.reference_to_value = lambda x: x
 
     def map(self, pack):
         return type(self)(
@@ -554,11 +553,7 @@ class SampledFromStrategy(SearchStrategy[Ex]):
         return result
 
     def get_element(self, i):
-        element = self.elements[i]
-        value = self._transform(self.reference_to_value(element))
-        if is_identity_function(self.reference_to_value):
-            return value
-        return element if value is not filter_not_satisfied else filter_not_satisfied
+        return self._transform(self.elements[i])
 
     def do_filtered_draw(self, data):
         # Set of indices that have been tried so far, so that we never test

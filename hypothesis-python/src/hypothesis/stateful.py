@@ -60,6 +60,7 @@ from hypothesis.strategies._internal.strategies import (
     SampledFromStrategy,
     SearchStrategy,
     check_strategy,
+    filter_not_satisfied,
 )
 from hypothesis.vendor.pretty import RepresentationPrinter
 
@@ -526,6 +527,11 @@ class Bundle(SampledFromStrategy[Ex]):
         assert isinstance(element, VarReference)
         return self.machine.names_to_values.get(element.name)
 
+    def get_element(self, i):
+        element = self.elements[i]
+        value = self._transform(self.reference_to_value(element))
+        return element if value is not filter_not_satisfied else filter_not_satisfied
+
     def do_draw(self, data):
         self.machine = data.draw(self_strategy)
         self.bundle = self.machine.bundle(self.name)
@@ -542,7 +548,9 @@ class Bundle(SampledFromStrategy[Ex]):
             self.bundle.pop(idx)  # pragma: no cover # coverage is flaky here
 
         if not self.draw_references:
-            return self.machine.names_to_values[reference.name]
+            return self.machine.names_to_values[
+                reference.name
+            ]  # currently missing the mapped case
 
         return reference
 
