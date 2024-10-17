@@ -1434,25 +1434,26 @@ def test_flatmap_with_combinations():
 
         @rule(
             target=buns,
-            bun=buns.flatmap(lambda x: just(x + 1)).filter(lambda x: x > 0),
+            bun=buns.flatmap(lambda x: just(-x)).filter(lambda x: x < -1),
         )
         def use_flatmap_filtered(self, bun):
             assert isinstance(bun, int)
-            assert bun > 0
-            return bun
+            assert bun < -1
+            return -bun
 
         @rule(
             target=buns,
-            bun=buns.flatmap(lambda x: just(x + 1)).map(lambda x: -(x + 1)),
+            bun=buns.flatmap(lambda x: just(x + 1)).map(lambda x: -x),
         )
         def use_flatmap_mapped(self, bun):
             assert isinstance(bun, int)
             assert bun < 0
-            return bun
+            return -bun
 
         @rule(bun=buns)
         def use_directly(self, bun):
             assert isinstance(bun, int)
+            assert bun >= 0
 
     Machine.TestCase.settings = Settings(stateful_step_count=5, max_examples=10)
     run_state_machine_as_test(Machine)
@@ -1479,7 +1480,7 @@ def test_map_with_combinations():
             assert bun < -1
 
         @rule(
-            bun=buns.map(lambda x: -x).flatmap(lambda x: just(abs(x))),
+            bun=buns.map(lambda x: -x).flatmap(lambda x: just(abs(x) + 1)),
         )
         def use_flatmap_mapped(self, bun):
             assert isinstance(bun, int)
@@ -1500,7 +1501,7 @@ def test_filter_with_combinations():
 
         @initialize(target=buns)
         def create_bun(self):
-            return multiple(0, 1, 2)
+            return multiple(0, -1, -2)
 
         @rule(bun=buns.filter(lambda x: x > 0))
         def use_filter_base(self, bun):
@@ -1515,11 +1516,11 @@ def test_filter_with_combinations():
             assert bun < 0
 
         @rule(
-            bun=buns.filter(lambda x: x > 0).map(lambda x: -x),
+            bun=buns.filter(lambda x: x < 0).map(lambda x: -x),
         )
         def use_flatmap_mapped(self, bun):
             assert isinstance(bun, int)
-            assert bun < 0
+            assert bun > 0
 
         @rule(bun=buns)
         def use_directly(self, bun):
@@ -1527,3 +1528,37 @@ def test_filter_with_combinations():
 
     Machine.TestCase.settings = Settings(stateful_step_count=5, max_examples=10)
     run_state_machine_as_test(Machine)
+
+
+def test_mapped_values_assigned_properly():
+    class Machine(RuleBasedStateMachine):
+        a = Bundle("a")
+
+        @initialize(target=a)
+        def initialize(self):
+            return multiple("ret1", "ret2")
+
+        @rule(
+            a1=a,
+            a2=a.map(lambda x: x + x),
+            a3=consumes(a).map(lambda x: x + x),
+            a4=a,
+        )
+        def fail_fast(self, a1, a2, a3, a4):
+            raise AssertionError
+
+    Machine.TestCase.settings = NO_BLOB_SETTINGS
+    with pytest.raises(AssertionError) as err:
+        run_state_machine_as_test(Machine)
+
+    result = "\n".join(err.value.__notes__)
+    assert (
+        result
+        == """
+Falsifying example:
+state = Machine()
+a_0, a_1 = state.initialize()
+state.fail_fast(a1=a_1, a2=a_1, a3=a_1, a4=a_0)
+state.teardown()
+""".strip()
+    )
